@@ -4,6 +4,11 @@ import { OrganizationSwitcher, UserButton } from "@clerk/nextjs"
 import { Plus, Workflow } from "lucide-react"
 
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
@@ -16,7 +21,9 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
+  SidebarSeparator,
   SidebarTrigger,
+  useSidebar,
 } from "@/components/ui/sidebar"
 
 const workflows = [
@@ -30,6 +37,75 @@ const workflows = [
   "proud-weasel",
   "regional-bonobo",
 ]
+
+export function WorkflowNav() {
+  const { state } = useSidebar()
+
+  if (state === "collapsed") {
+    return (
+      <SidebarGroup>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <Popover>
+              <PopoverTrigger asChild>
+                <SidebarMenuButton>
+                  <Workflow />
+                  <span>Workflows</span>
+                </SidebarMenuButton>
+              </PopoverTrigger>
+              <PopoverContent side="right" align="start">
+                <SidebarMenu>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton>
+                      <Plus />
+                      <span>New workflow</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </SidebarMenu>
+                <SidebarSeparator />
+                <SidebarMenu>
+                  {workflows.map((workflow, index) => (
+                    <SidebarMenuItem key={workflow}>
+                      <SidebarMenuButton isActive={index === 0}>
+                        <span>{workflow}</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </PopoverContent>
+            </Popover>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarGroup>
+    )
+  }
+
+  return (
+    <SidebarGroup className="pt-2">
+      <SidebarGroupLabel className="h-7 px-2 text-[11px]">
+        Workflows
+      </SidebarGroupLabel>
+      <SidebarGroupAction aria-label="Create workflow" title="Create workflow">
+        <Plus />
+      </SidebarGroupAction>
+      <SidebarGroupContent>
+        <SidebarMenu>
+          {workflows.map((workflow, index) => (
+            <SidebarMenuItem key={workflow}>
+              <SidebarMenuButton
+                size="sm"
+                isActive={index === 0}
+                className="h-7 px-2 text-xs"
+              >
+                <span>{workflow}</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          ))}
+        </SidebarMenu>
+      </SidebarGroupContent>
+    </SidebarGroup>
+  )
+}
 
 export function AppSidebar() {
   return (
@@ -54,31 +130,7 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent>
-        <SidebarGroup className="pt-2">
-          <SidebarGroupLabel className="h-7 px-2 text-[11px]">
-            Workflows
-          </SidebarGroupLabel>
-          <SidebarGroupAction aria-label="Create workflow" title="Create workflow">
-            <Plus />
-          </SidebarGroupAction>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {workflows.map((workflow, index) => (
-                <SidebarMenuItem key={workflow}>
-                  <SidebarMenuButton
-                    size="sm"
-                    isActive={index === 0}
-                    tooltip={workflow}
-                    className="h-7 px-2 text-xs"
-                  >
-                    <Workflow />
-                    <span>{workflow}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        <WorkflowNav />
       </SidebarContent>
 
       <SidebarFooter className="items-start px-3 py-3 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-2">

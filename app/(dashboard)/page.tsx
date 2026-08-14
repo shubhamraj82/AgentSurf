@@ -21,7 +21,7 @@ export default function Page() {
           <EmptyTitle className="text-base">No workflow selected</EmptyTitle>
           <EmptyDescription className="max-w-xs text-base">
             Select a workflow from the sidebar
-            <br />
+            <br/>
             or create a new one to get started.
           </EmptyDescription>
         </EmptyHeader>

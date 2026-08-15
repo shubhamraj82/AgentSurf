@@ -1,6 +1,8 @@
 "use client"
 
 import { Plus, Workflow as WorkflowIcon } from "lucide-react"
+import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { useTransition } from "react"
 
 import {
@@ -27,11 +29,9 @@ interface WorkflowNavProps {
   onCreateWorkflow: (name: string) => Promise<void>
 }
 
-export function WorkflowNav({
-  workflows,
-  onCreateWorkflow,
-}: WorkflowNavProps) {
+export function WorkflowNav({ workflows, onCreateWorkflow }: WorkflowNavProps) {
   const { state } = useSidebar()
+  const pathname = usePathname()
   const [isPending, startTransition] = useTransition()
 
   function handleCreateWorkflow() {
@@ -68,8 +68,13 @@ export function WorkflowNav({
                 <SidebarMenu>
                   {workflows.map((workflow) => (
                     <SidebarMenuItem key={workflow.id}>
-                      <SidebarMenuButton>
-                        <span>{workflow.name}</span>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={pathname === `/workflows/${workflow.id}`}
+                      >
+                        <Link href={`/workflows/${workflow.id}`}>
+                          <span>{workflow.name}</span>
+                        </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                   ))}
@@ -99,8 +104,15 @@ export function WorkflowNav({
         <SidebarMenu>
           {workflows.map((workflow) => (
             <SidebarMenuItem key={workflow.id}>
-              <SidebarMenuButton size="sm" className="h-7 px-2 text-xs">
-                <span>{workflow.name}</span>
+              <SidebarMenuButton
+                asChild
+                isActive={pathname === `/workflows/${workflow.id}`}
+                size="sm"
+                className="h-7 px-2 text-xs"
+              >
+                <Link href={`/workflows/${workflow.id}`}>
+                  <span>{workflow.name}</span>
+                </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
           ))}

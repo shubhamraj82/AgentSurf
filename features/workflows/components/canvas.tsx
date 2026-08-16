@@ -12,37 +12,32 @@ import {
   type ColorMode,
   type Connection,
   type Edge,
-  type Node,
+  NodeTypes,
 } from "@xyflow/react"
 import { useTheme } from "next-themes"
 import { useCallback, useSyncExternalStore } from "react"
 
+import { StepNode } from "./step-node"
+import type {StepNodeType} from "../nodes/node-registry"
+
 import "@xyflow/react/dist/style.css"
 
-const initialNodes: Node[] = [
+const nodeTypes:NodeTypes = {step:StepNode}
+
+const initialNodes: StepNodeType[] = [
   {
-    id: "1",
-    position: { x: 0, y: 0 },
-    data: { label: "Start" },
-    type: "input",
-  },
-  {
-    id: "2",
-    position: { x: 250, y: 100 },
-    data: { label: "Process workflow" },
-  },
-  {
-    id: "3",
-    position: { x: 500, y: 0 },
-    data: { label: "Finish" },
-    type: "output",
+    id:"start",
+    type:"step",
+    position:{x:0,y:0},
+    data:{
+      type:"start",
+      kind:"trigger",
+      title:"Start",
+      values:{}},
   },
 ]
 
-const initialEdges: Edge[] = [
-  { id: "1-2", source: "1", target: "2" },
-  { id: "2-3", source: "2", target: "3" },
-]
+const initialEdges: Edge[] = []
 
 const subscribe = () => () => {}
 const getClientSnapshot = () => true
@@ -68,6 +63,7 @@ export function Canvas() {
   return (
     <div className="size-full">
       <ReactFlow
+        nodeTypes={nodeTypes}
         nodes={nodes}
         edges={edges}
         onNodesChange={onNodesChange}

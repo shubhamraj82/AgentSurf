@@ -4,6 +4,10 @@
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
 <!-- END:nextjs-agent-rules -->
 
+# React Flow documentation
+
+Do not rely on training data when using React Flow APIs, components, hooks, types, configuration, or usage patterns. Before writing or changing React Flow code, search the current official documentation index at https://reactflow.dev/llms.txt and consult the relevant linked documentation pages.
+
 
 # Database types
 

@@ -24,6 +24,10 @@ export async function AppSidebar({
       <SidebarHeader className="h-12 min-w-0 flex-row items-center justify-between overflow-hidden border-b border-sidebar-border/50 px-3 group-data-[collapsible=icon]:w-(--sidebar-width-icon) group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-2">
         <div className="min-w-0 overflow-hidden group-data-[collapsible=icon]:hidden">
           <OrganizationSwitcher
+          afterCreateOrganizationUrl="/"
+          afterSelectOrganizationUrl="/"
+          afterLeaveOrganizationUrl="/"
+
             hidePersonal
             appearance={{
               elements: {

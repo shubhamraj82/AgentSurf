@@ -1,93 +1,258 @@
 "use client"
 
-import { useRealtimeRun } from "@trigger.dev/react-hooks"
+import { useState } from "react"
+import { MoreHorizontal,Play,Trash2 } from "lucide-react"
 import {
-  CircleAlertIcon,
-  CircleCheckIcon,
-  LoaderCircleIcon,
-  PlayIcon,
-} from "lucide-react"
-import { useState, useTransition } from "react"
-
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
 import { Button } from "@/components/ui/button"
-import { runWorkflowAction } from "@/features/workflows/actions"
-import type { helloWorldTask } from "@/trigger/example"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { ResizablePanel } from "@/components/ui/resizable"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { cn } from "@/lib/utils"
+ import {
+  nodeRegistry,
+  type NodeDefinition,
+  type NodeType,
+  type NodeField,
+  type StepNodeKind,
+  type StepNodeType,
+ } from "@/features/workflows/nodes/node-registry"
 
-type RunSubscription = Awaited<ReturnType<typeof runWorkflowAction>>
-
-const failedStatuses = new Set([
-  "CANCELED",
-  "FAILED",
-  "CRASHED",
-  "SYSTEM_FAILURE",
-  "EXPIRED",
-  "TIMED_OUT",
-])
-
-export function RightSidebar() {
-  const [subscription, setSubscription] = useState<RunSubscription>()
-  const [actionError, setActionError] = useState<string>()
-  const [isPending, startTransition] = useTransition()
-  const { run, error: realtimeError } = useRealtimeRun<typeof helloWorldTask>(
-    subscription?.runId,
-    {
-      accessToken: subscription?.publicAccessToken,
-      enabled: Boolean(subscription),
-    }
-  )
-
-  const isComplete = run?.status === "COMPLETED"
-  const hasFailed = run ? failedStatuses.has(run.status) : false
-
-  function onRun() {
-    startTransition(async () => {
-      setActionError(undefined)
-
-      try {
-        setSubscription(await runWorkflowAction())
-      } catch (error) {
-        setActionError(
-          error instanceof Error
-            ? error.message
-            : "Unable to start the workflow"
-        )
-      }
-    })
-  }
-
+function NodeIcon({ type, className }: { type: NodeType; className?: string }) {
+  const def=nodeRegistry[type]
+  const Icon = def.icon
   return (
-    <div className="flex size-full flex-col items-center justify-center gap-3">
-      <Button onClick={onRun} disabled={isPending}>
-        {isPending ? (
-          <LoaderCircleIcon className="animate-spin" data-icon="inline-start" />
-        ) : (
-          <PlayIcon data-icon="inline-start" />
-        )}
-        {isPending ? "Starting..." : "Run"}
-      </Button>
-
-      {run && (
-        <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-          {isComplete ? (
-            <CircleCheckIcon className="size-4 text-green-600" />
-          ) : hasFailed ? (
-            <CircleAlertIcon className="size-4 text-destructive" />
-          ) : (
-            <LoaderCircleIcon className="size-4 animate-spin" />
-          )}
-          <span>{run.status.toLowerCase().replaceAll("_", " ")}</span>
-        </div>
+    <span
+      className={cn(
+        "flex size-6 shrink-0 items-center justify-center rounded-md",
+        def.accent,
+        className
       )}
+    >
+      <Icon className="size-3.5" />
+    </span>
+  )
+}
 
-      {isComplete && run.output?.message && (
-        <p className="text-sm text-muted-foreground">{run.output.message}</p>
-      )}
-
-      {(actionError || realtimeError) && (
-        <p role="alert" className="text-sm text-destructive">
-          {actionError ?? realtimeError?.message}
-        </p>
-      )}
+function Section ({
+  title,
+  icon,
+  children,
+}:{
+  title:string
+  icon?:React.ReactNode
+  children:React.ReactNode
+}) {
+  return(
+    <div className="flex min-h-0 flex-col">
+      <div className="flex items-center gap-2 border-y border-border bg-card px-3 py-1.5 text-sm font-semibold">
+        {icon}
+        {title}
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
     </div>
   )
 }
+
+function FieldInput({
+  field,
+  value,
+  onChange,
+}:{
+  field:NodeField
+  value:string
+  onChange:(value : string)=>void
+}){
+  return(
+    <Input
+    id={field.key}
+    value={value}
+    placeholder={field.placeholder}
+    onChange={(e)=> onChange(e.target.value)}
+    />
+  )
+}
+
+function Inspector({node}:{node:StepNodeType | undefined}){
+  if(!node){
+    return(
+      <Section title="Editoor">
+        <p className="p-3 text-sm text-muted-foreground">No node selected</p>
+      </Section>
+    )
+  }
+
+  const {type,title,values}=node.data
+  const def:NodeDefinition=nodeRegistry[type]
+
+  return(
+    <Section title={title} icon={<NodeIcon type={type} />}>
+      <div className="flex flex-col gap-3 p-3">
+        {def.fields.length ===0 ? (
+          <p className="text-xs text-muted-foreground">No properties</p>
+        ):(
+          def.fields.map((field)=>(
+            <div key={field.key} className="flex flex-col gap-1.5">
+              <Label htmlFor={field.key} className="text-xs">
+                {field.label}
+                </Label>
+              <FieldInput
+              field={field}
+              value={values[field.key] ?? ""}
+              onChange={(value)=>{
+                void value
+              }}
+              />
+            </div>
+          ))
+        )}
+      </div>
+    </Section>
+  )
+}
+
+const sections:{kind:StepNodeKind,label:string}[]=[
+  {kind:"trigger", label:"Triggers"},
+  {kind:"action", label:"Actions"}
+]
+
+const definitions = Object.values(nodeRegistry)
+
+function Palette(){
+  const add = (type:NodeType)=>{
+    void type
+  }
+
+  return (
+    <Section title="Toolbar">
+      <Accordion
+      type="multiple"
+      defaultValue={sections.map((s)=>s.kind)}
+      className="px-3 py-2"
+      >
+        {sections.map((section)=>(
+          <AccordionItem
+          key={section.kind}
+          value={section.kind}
+          className="not-last:border-b-0"
+          >
+            <AccordionTrigger className="py-2 text-xs font-medium text-muted-foreground hover:no-underline">
+              {section.label}
+            </AccordionTrigger>
+            <AccordionContent className="flex flex-col gap-0.5">
+              {definitions
+              .filter((def)=>def.kind === section.kind)
+              .map((def)=>(
+                <Button
+                key={def.type}
+                variant="ghost"
+                onClick={()=>add(def.type as NodeType)}
+                className="justify-start text-sm gap-2.5 px-1.5"
+                >
+                  <NodeIcon type={def.type as NodeType}/>
+                  {def.label}
+                </Button>
+              ))}
+            </AccordionContent>
+          </AccordionItem>
+        ))}
+      </Accordion>
+    </Section>
+  )
+}
+
+function ActionMenu(){
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button size="icon" variant="ghost">
+          <MoreHorizontal/>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="min-w-48">
+        <DropdownMenuItem
+        variant="destructive"
+        className="text-xs [&_svg:not([class*='size'])]:size-3.5"
+        onSelect={()=>{
+          // TODO: delete the workflow , then navigate away
+        }}
+        >
+          <Trash2/>
+          Delete workflow
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+function RunButton(){
+  return (
+    <Button
+    size="sm"
+    variant="secondary"
+    onClick={()=>{
+      // TODO: validate the graph and run the workflow (toggle to stop while running)
+    }}
+    >
+      <Play fill="primary"/>
+      Run
+    </Button>
+  )
+}
+
+export function RightSidebar(){
+  const [tab,setTab]=useState("toolbar")
+  const selected:StepNodeType | undefined =undefined
+
+  return (
+    <ResizablePanel
+    className="bg-background"
+    defaultSize="16rem"
+    minSize="14rem"
+    maxSize="36rem"
+    groupResizeBehavior="preserve-pixel-size"
+    >
+      <Tabs value={tab} onValueChange={setTab} className="size-full gap-0">
+        <div className="flex items-center justify-between border-b border-border p-2">
+          <ActionMenu/>
+          <RunButton/>
+        </div>
+        <TabsList className="m-2 w-fit bg-background">
+          <TabsTrigger
+          value="toolbar"
+          className="flex-none rounded-sm data-active:bg-accent! data-active:text-accent-foreground! data-active:shadow-none!
+          dark:data-active:border-transparent!"
+          >
+            Toolbar
+          </TabsTrigger>
+          <TabsTrigger
+          value="editor"
+          className="flex-none rounded-sm data-active:bg-accent!
+          data-active:text-accent-foreground! data-active:shadow-none!
+          dark:data-active:border-transparent!"
+          >
+            Editor
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="toolbar" className="flex min-h-0 flex-col">
+          <Palette/>
+        </TabsContent>
+        <TabsContent value="editor" className="flex min-h-0 flex-col">
+          <Inspector node={selected}/>
+        </TabsContent>
+      </Tabs>
+    </ResizablePanel>
+  )
+}
+

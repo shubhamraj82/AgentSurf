@@ -11,30 +11,31 @@ import {
   NodeTypes,
   Panel,
 } from "@xyflow/react"
-import { useLiveblocksFlow,Cursors } from "@liveblocks/react-flow"
+import { useLiveblocksFlow, Cursors } from "@liveblocks/react-flow"
 import { useTheme } from "next-themes"
 import { useSyncExternalStore } from "react"
-import {AvatarStack} from "@liveblocks/react-ui"
+import { AvatarStack } from "@liveblocks/react-ui"
 
 import { StepNode } from "./step-node"
-import type {StepNodeType} from "../nodes/node-registry"
+import type { StepNodeType } from "../nodes/node-registry"
 
 import "@xyflow/react/dist/style.css"
 import "@liveblocks/react-ui/styles.css"
 import "@liveblocks/react-flow/styles.css"
 
-const nodeTypes:NodeTypes = {step:StepNode}
+const nodeTypes: NodeTypes = { step: StepNode }
 
 const initialNodes: StepNodeType[] = [
   {
-    id:"start",
-    type:"step",
-    position:{x:0,y:0},
-    data:{
-      type:"start",
-      kind:"trigger",
-      title:"Start",
-      values:{}},
+    id: "start",
+    type: "step",
+    position: { x: 0, y: 0 },
+    data: {
+      type: "start",
+      kind: "trigger",
+      title: "Start",
+      values: {},
+    },
   },
 ]
 
@@ -51,23 +52,17 @@ export function Canvas() {
     getClientSnapshot,
     getServerSnapshot
   )
-  const {
-    nodes,
-    edges,
-    onNodesChange,
-    onEdgesChange,
-    onConnect,
-    onDelete,
-  } = useLiveblocksFlow<StepNodeType, Edge>({
-    suspense: true,
-    nodes: { initial: initialNodes },
-    edges: { initial: initialEdges },
-  })
+  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, onDelete } =
+    useLiveblocksFlow<StepNodeType, Edge>({
+      suspense: true,
+      nodes: { initial: initialNodes },
+      edges: { initial: initialEdges },
+    })
   const colorMode: ColorMode =
     mounted && resolvedTheme === "dark" ? "dark" : "light"
 
   return (
-    <div className="size-full">
+    <div id="workflow-canvas" className="size-full">
       <ReactFlow
         nodeTypes={nodeTypes}
         nodes={nodes}
@@ -95,9 +90,9 @@ export function Canvas() {
       >
         <Background />
         <Controls />
-        <Cursors/>
+        <Cursors />
         <Panel position="top-right">
-          <AvatarStack/>
+          <AvatarStack />
         </Panel>
         <MiniMap />
       </ReactFlow>

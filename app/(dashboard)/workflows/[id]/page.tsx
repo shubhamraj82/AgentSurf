@@ -1,4 +1,5 @@
 import { auth } from "@clerk/nextjs/server"
+import { ReactFlowProvider } from "@xyflow/react"
 import { notFound } from "next/navigation"
 
 import { Room } from "@/features/workflows/components/room"
@@ -32,8 +33,12 @@ export default async function Page({
   })
 
   return (
-    <Room roomId={id}>
-      <WorkflowShell workflowId={id} />
-    </Room>
+    
+      <Room roomId={id}>
+        <ReactFlowProvider>  
+        <WorkflowShell workflowId={id} />
+        </ReactFlowProvider>
+      </Room>
+    
   )
 }

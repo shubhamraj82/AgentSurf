@@ -1,7 +1,9 @@
 "use client"
 
 import { useState } from "react"
-import { MoreHorizontal,Play,Trash2 } from "lucide-react"
+import { MoreHorizontal, Play, Trash2 } from "lucide-react"
+import { useReactFlow,useStore } from "@xyflow/react"
+import { toast } from "sonner"
 import {
   Accordion,
   AccordionContent,
@@ -20,17 +22,17 @@ import { Label } from "@/components/ui/label"
 import { ResizablePanel } from "@/components/ui/resizable"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
- import {
+import {
   nodeRegistry,
   type NodeDefinition,
   type NodeType,
   type NodeField,
   type StepNodeKind,
   type StepNodeType,
- } from "@/features/workflows/nodes/node-registry"
+} from "@/features/workflows/nodes/node-registry"
 
 function NodeIcon({ type, className }: { type: NodeType; className?: string }) {
-  const def=nodeRegistry[type]
+  const def = nodeRegistry[type]
   const Icon = def.icon
   return (
     <span
@@ -45,16 +47,16 @@ function NodeIcon({ type, className }: { type: NodeType; className?: string }) {
   )
 }
 
-function Section ({
+function Section({
   title,
   icon,
   children,
-}:{
-  title:string
-  icon?:React.ReactNode
-  children:React.ReactNode
+}: {
+  title: string
+  icon?: React.ReactNode
+  children: React.ReactNode
 }) {
-  return(
+  return (
     <div className="flex min-h-0 flex-col">
       <div className="flex items-center gap-2 border-y border-border bg-card px-3 py-1.5 text-sm font-semibold">
         {icon}
@@ -69,50 +71,50 @@ function FieldInput({
   field,
   value,
   onChange,
-}:{
-  field:NodeField
-  value:string
-  onChange:(value : string)=>void
-}){
-  return(
+}: {
+  field: NodeField
+  value: string
+  onChange: (value: string) => void
+}) {
+  return (
     <Input
-    id={field.key}
-    value={value}
-    placeholder={field.placeholder}
-    onChange={(e)=> onChange(e.target.value)}
+      id={field.key}
+      value={value}
+      placeholder={field.placeholder}
+      onChange={(e) => onChange(e.target.value)}
     />
   )
 }
 
-function Inspector({node}:{node:StepNodeType | undefined}){
-  if(!node){
-    return(
+function Inspector({ node }: { node: StepNodeType | undefined }) {
+  if (!node) {
+    return (
       <Section title="Editoor">
         <p className="p-3 text-sm text-muted-foreground">No node selected</p>
       </Section>
     )
   }
 
-  const {type,title,values}=node.data
-  const def:NodeDefinition=nodeRegistry[type]
+  const { type, title, values } = node.data
+  const def: NodeDefinition = nodeRegistry[type]
 
-  return(
+  return (
     <Section title={title} icon={<NodeIcon type={type} />}>
       <div className="flex flex-col gap-3 p-3">
-        {def.fields.length ===0 ? (
+        {def.fields.length === 0 ? (
           <p className="text-xs text-muted-foreground">No properties</p>
-        ):(
-          def.fields.map((field)=>(
+        ) : (
+          def.fields.map((field) => (
             <div key={field.key} className="flex flex-col gap-1.5">
               <Label htmlFor={field.key} className="text-xs">
                 {field.label}
-                </Label>
+              </Label>
               <FieldInput
-              field={field}
-              value={values[field.key] ?? ""}
-              onChange={(value)=>{
-                void value
-              }}
+                field={field}
+                value={values[field.key] ?? ""}
+                onChange={(value) => {
+                  void value
+                }}
               />
             </div>
           ))
@@ -122,48 +124,100 @@ function Inspector({node}:{node:StepNodeType | undefined}){
   )
 }
 
-const sections:{kind:StepNodeKind,label:string}[]=[
-  {kind:"trigger", label:"Triggers"},
-  {kind:"action", label:"Actions"}
+const sections: { kind: StepNodeKind; label: string }[] = [
+  { kind: "trigger", label: "Triggers" },
+  { kind: "action", label: "Actions" },
 ]
 
 const definitions = Object.values(nodeRegistry)
 
-function Palette(){
-  const add = (type:NodeType)=>{
-    void type
+function Palette() {
+  const reactFlow = useReactFlow<StepNodeType>()
+
+  const add = (type: NodeType) => {
+    const definition = nodeRegistry[type]
+    const nodes = reactFlow.getNodes()
+
+    if (
+      definition.kind === "trigger" &&
+      nodes.some((node) => node.data.kind === "trigger")
+    ) {
+      toast.error("A workflow can only have one trigger")
+      return
+    }
+
+    const canvas = document.getElementById("workflow-canvas")
+
+    if (!canvas || !reactFlow.viewportInitialized) {
+      toast.error("The canvas is not ready yet")
+      return
+    }
+
+    const bounds = canvas.getBoundingClientRect()
+    const position = reactFlow.screenToFlowPosition({
+      x: bounds.left + bounds.width / 2,
+      y: bounds.top + bounds.height / 2,
+    })
+    const nextTypeNumber =
+      Math.max(
+        0,
+        ...nodes
+          .filter((node) => node.data.type === type)
+          .map((node) => {
+            const suffix = node.data.title.slice(definition.label.length).trim()
+            const number = Number(suffix)
+
+            return Number.isInteger(number) && number > 0 ? number : 0
+          })
+      ) + 1
+
+    reactFlow.addNodes({
+      id: crypto.randomUUID(),
+      type: "step",
+      position,
+      origin: [0.5, 0.5],
+      data: {
+        type,
+        kind: definition.kind,
+        title:
+          definition.kind === "action"
+            ? `${definition.label} ${nextTypeNumber}`
+            : definition.label,
+        values: {},
+      },
+    })
   }
 
   return (
     <Section title="Toolbar">
       <Accordion
-      type="multiple"
-      defaultValue={sections.map((s)=>s.kind)}
-      className="px-3 py-2"
+        type="multiple"
+        defaultValue={sections.map((s) => s.kind)}
+        className="px-3 py-2"
       >
-        {sections.map((section)=>(
+        {sections.map((section) => (
           <AccordionItem
-          key={section.kind}
-          value={section.kind}
-          className="not-last:border-b-0"
+            key={section.kind}
+            value={section.kind}
+            className="not-last:border-b-0"
           >
             <AccordionTrigger className="py-2 text-xs font-medium text-muted-foreground hover:no-underline">
               {section.label}
             </AccordionTrigger>
             <AccordionContent className="flex flex-col gap-0.5">
               {definitions
-              .filter((def)=>def.kind === section.kind)
-              .map((def)=>(
-                <Button
-                key={def.type}
-                variant="ghost"
-                onClick={()=>add(def.type as NodeType)}
-                className="justify-start text-sm gap-2.5 px-1.5"
-                >
-                  <NodeIcon type={def.type as NodeType}/>
-                  {def.label}
-                </Button>
-              ))}
+                .filter((def) => def.kind === section.kind)
+                .map((def) => (
+                  <Button
+                    key={def.type}
+                    variant="ghost"
+                    onClick={() => add(def.type as NodeType)}
+                    className="justify-start gap-2.5 px-1.5 text-sm"
+                  >
+                    <NodeIcon type={def.type as NodeType} />
+                    {def.label}
+                  </Button>
+                ))}
             </AccordionContent>
           </AccordionItem>
         ))}
@@ -172,23 +226,23 @@ function Palette(){
   )
 }
 
-function ActionMenu(){
+function ActionMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button size="icon" variant="ghost">
-          <MoreHorizontal/>
+          <MoreHorizontal />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="min-w-48">
         <DropdownMenuItem
-        variant="destructive"
-        className="text-xs [&_svg:not([class*='size'])]:size-3.5"
-        onSelect={()=>{
-          // TODO: delete the workflow , then navigate away
-        }}
+          variant="destructive"
+          className="text-xs [&_svg:not([class*='size'])]:size-3.5"
+          onSelect={() => {
+            // TODO: delete the workflow , then navigate away
+          }}
         >
-          <Trash2/>
+          <Trash2 />
           Delete workflow
         </DropdownMenuItem>
       </DropdownMenuContent>
@@ -196,63 +250,59 @@ function ActionMenu(){
   )
 }
 
-function RunButton(){
+function RunButton() {
   return (
     <Button
-    size="sm"
-    variant="secondary"
-    onClick={()=>{
-      // TODO: validate the graph and run the workflow (toggle to stop while running)
-    }}
+      size="sm"
+      variant="secondary"
+      onClick={() => {
+        // TODO: validate the graph and run the workflow (toggle to stop while running)
+      }}
     >
-      <Play fill="primary"/>
+      <Play fill="primary" />
       Run
     </Button>
   )
 }
 
-export function RightSidebar(){
-  const [tab,setTab]=useState("toolbar")
-  const selected:StepNodeType | undefined =undefined
+export function RightSidebar() {
+  const [tab, setTab] = useState("toolbar")
+  const selected: StepNodeType | undefined = undefined
 
   return (
     <ResizablePanel
-    className="bg-background"
-    defaultSize="16rem"
-    minSize="14rem"
-    maxSize="36rem"
-    groupResizeBehavior="preserve-pixel-size"
+      className="bg-background"
+      defaultSize="16rem"
+      minSize="14rem"
+      maxSize="36rem"
+      groupResizeBehavior="preserve-pixel-size"
     >
       <Tabs value={tab} onValueChange={setTab} className="size-full gap-0">
         <div className="flex items-center justify-between border-b border-border p-2">
-          <ActionMenu/>
-          <RunButton/>
+          <ActionMenu />
+          <RunButton />
         </div>
         <TabsList className="m-2 w-fit bg-background">
           <TabsTrigger
-          value="toolbar"
-          className="flex-none rounded-sm data-active:bg-accent! data-active:text-accent-foreground! data-active:shadow-none!
-          dark:data-active:border-transparent!"
+            value="toolbar"
+            className="flex-none rounded-sm data-active:bg-accent! data-active:text-accent-foreground! data-active:shadow-none! dark:data-active:border-transparent!"
           >
             Toolbar
           </TabsTrigger>
           <TabsTrigger
-          value="editor"
-          className="flex-none rounded-sm data-active:bg-accent!
-          data-active:text-accent-foreground! data-active:shadow-none!
-          dark:data-active:border-transparent!"
+            value="editor"
+            className="flex-none rounded-sm data-active:bg-accent! data-active:text-accent-foreground! data-active:shadow-none! dark:data-active:border-transparent!"
           >
             Editor
           </TabsTrigger>
         </TabsList>
         <TabsContent value="toolbar" className="flex min-h-0 flex-col">
-          <Palette/>
+          <Palette />
         </TabsContent>
         <TabsContent value="editor" className="flex min-h-0 flex-col">
-          <Inspector node={selected}/>
+          <Inspector node={selected} />
         </TabsContent>
       </Tabs>
     </ResizablePanel>
   )
 }
-

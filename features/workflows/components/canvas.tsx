@@ -9,10 +9,12 @@ import {
   type ColorMode,
   type Edge,
   NodeTypes,
+  Panel,
 } from "@xyflow/react"
 import { useLiveblocksFlow,Cursors } from "@liveblocks/react-flow"
 import { useTheme } from "next-themes"
 import { useSyncExternalStore } from "react"
+import {AvatarStack} from "@liveblocks/react-ui"
 
 import { StepNode } from "./step-node"
 import type {StepNodeType} from "../nodes/node-registry"
@@ -94,6 +96,9 @@ export function Canvas() {
         <Background />
         <Controls />
         <Cursors/>
+        <Panel position="top-right">
+          <AvatarStack/>
+        </Panel>
         <MiniMap />
       </ReactFlow>
     </div>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useTransition } from "react"
 import { MoreHorizontal, Play, Trash2 } from "lucide-react"
 import { useReactFlow,useStore } from "@xyflow/react"
 import { toast } from "sonner"
@@ -21,7 +21,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ResizablePanel } from "@/components/ui/resizable"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
+import { deleteWorkflowAction } from "@/features/workflows/actions"
 import {
   nodeRegistry,
   type NodeDefinition,
@@ -67,7 +69,7 @@ function Section({
   )
 }
 
-function FieldInput({
+function Field({
   field,
   value,
   onChange,
@@ -76,17 +78,24 @@ function FieldInput({
   value: string
   onChange: (value: string) => void
 }) {
-  return (
-    <Input
-      id={field.key}
-      value={value}
-      placeholder={field.placeholder}
-      onChange={(e) => onChange(e.target.value)}
-    />
+  const sharedProps = {
+    id: field.key,
+    value,
+    placeholder: field.placeholder,
+    onChange: (
+      event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+    ) => onChange(event.target.value),
+  }
+
+  return field.multiline ? (
+    <Textarea {...sharedProps} />
+  ) : (
+    <Input {...sharedProps} />
   )
 }
 
 function Inspector({ node }: { node: StepNodeType | undefined }) {
+  const {updateNodeData} = useReactFlow<StepNodeType>()
   if (!node) {
     return (
       <Section title="Editoor">
@@ -108,12 +117,15 @@ function Inspector({ node }: { node: StepNodeType | undefined }) {
             <div key={field.key} className="flex flex-col gap-1.5">
               <Label htmlFor={field.key} className="text-xs">
                 {field.label}
+                {field.required && <span className="text-destructive">*</span>}
               </Label>
-              <FieldInput
+              <Field
                 field={field}
                 value={values[field.key] ?? ""}
                 onChange={(value) => {
-                  void value
+                  updateNodeData(node.id, {
+                    values: { ...values, [field.key]: value },
+                  })
                 }}
               />
             </div>
@@ -226,7 +238,9 @@ function Palette() {
   )
 }
 
-function ActionMenu() {
+function ActionMenu({ workflowId }: { workflowId: string }) {
+  const [isPending, startTransition] = useTransition()
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -237,9 +251,13 @@ function ActionMenu() {
       <DropdownMenuContent align="start" className="min-w-48">
         <DropdownMenuItem
           variant="destructive"
+          disabled={isPending}
           className="text-xs [&_svg:not([class*='size'])]:size-3.5"
-          onSelect={() => {
-            // TODO: delete the workflow , then navigate away
+          onSelect={(event) => {
+            event.preventDefault()
+            startTransition(async () => {
+              await deleteWorkflowAction(workflowId)
+            })
           }}
         >
           <Trash2 />
@@ -265,9 +283,16 @@ function RunButton() {
   )
 }
 
-export function RightSidebar() {
+export function RightSidebar({ workflowId }: { workflowId: string }) {
   const [tab, setTab] = useState("toolbar")
-  const selected: StepNodeType | undefined = undefined
+  // TODO: read the currently selected node from React flow
+  const selected=useStore((s)=>s.nodes.find((n)=>n.selected)) as StepNodeType | undefined
+  //TODO : auto-switch to the editor tab when the selection chnages
+  const [prevSelectedId,setPrevSelectedId]=useState(selected?.id)
+  if(selected && selected.id !== prevSelectedId){
+    setPrevSelectedId(selected.id)
+    setTab("editor")
+  }
 
   return (
     <ResizablePanel
@@ -279,7 +304,7 @@ export function RightSidebar() {
     >
       <Tabs value={tab} onValueChange={setTab} className="size-full gap-0">
         <div className="flex items-center justify-between border-b border-border p-2">
-          <ActionMenu />
+          <ActionMenu workflowId={workflowId} />
           <RunButton />
         </div>
         <TabsList className="m-2 w-fit bg-background">

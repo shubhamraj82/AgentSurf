@@ -58,6 +58,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/toposort": "^2.0.7",
     "clerk": "^2.3.0",
     "drizzle-kit": "^0.31.10",
     "eslint": "^9",

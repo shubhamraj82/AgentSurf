@@ -1,6 +1,8 @@
 import toposort from "toposort";
 import {logger,task} from "@trigger.dev/sdk"
 import {getWorkflow} from "@/features/workflows/data"
+import {Stagehand} from "@browserbasehq/stagehand"
+import {nodeExecutors} from "@/features/workflows/nodes/node-executer"
 
 export const runWorkflowTask = task({
     id: "run-workflow",
@@ -22,11 +24,34 @@ export const runWorkflowTask = task({
 
     logger.log(`Running workflow ${workflow.name}` , {steps:order.length})
 
+   
+   // The run owns one Browserbase session , opened lazily on the fist browser step
+   // and reused by every later one , so the recording spans the whole flow. The 
+   // LLM routes through Browserbase's model Gateway (BROWSERBASE_API_KEY), so no
+   // Seprate provider key is needed
+    let stagehand: Stagehand | undefined
+const getStagehand = async () => {
+    if (stagehand) return stagehand
+
+    stagehand = new Stagehand({
+        env: "BROWSERBASE",
+        apiKey: process.env.BROWSERBASE_API_KEY!,
+        model: "openai/gpt-5.4-mini",
+        disablePino: true,
+    })
+    await stagehand.init()
+
+    return stagehand
+}
     
     for(const id of order){
         const node = byId.get(id)
+        if(!node) continue
         logger.log(`Running step: ${node?.data.title}`)
+        const executor = nodeExecutors[node.data.type]
+        if(executor) await executor({values:node.data.values,getStagehand})
     }
+await stagehand?.close()
 
     return {steps:order.length}
     },

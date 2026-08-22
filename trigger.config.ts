@@ -22,7 +22,12 @@ export default defineConfig({
     // Stagehand loads its bundled Chrome extension ZIP from its package directory
     // when Browserbase sessions are created. Keep the package external so Trigger
     // installs that runtime asset instead of bundling only its JavaScript entrypoint.
-    external: ["@browserbasehq/stagehand"],
+    external: [
+      "@browserbasehq/stagehand",
+      "pino",
+      "pino-pretty",
+      "thread-stream",
+    ],
   },
   dirs: ["features"],
 });

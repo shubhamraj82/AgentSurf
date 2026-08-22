@@ -1,7 +1,7 @@
 import toposort from "toposort"
 import { logger, metadata, retry, task } from "@trigger.dev/sdk"
 import { getWorkflow } from "@/features/workflows/data"
-import { browserbase, Stagehand } from "@browserbasehq/stagehand"
+import { Stagehand } from "@browserbasehq/stagehand"
 import { nodeExecutors } from "@/features/workflows/nodes/node-executer"
 import {
   interpolate,
@@ -54,40 +54,33 @@ export const runWorkflowTask = task({
 
     // The run owns one Browserbase session, opened lazily on the first browser
     // step and reused by every later one, so the recording spans the whole flow.
-    let browser: Awaited<ReturnType<typeof browserbase.launch>> | undefined
     let stagehand: Stagehand | undefined
     const outputs: WorkflowNodeOutputs = {}
     const getStagehand = async () => {
       if (stagehand) return stagehand
 
       const browserbaseApiKey = process.env.BROWSERBASE_API_KEY
-      const openaiApiKey = process.env.OPENAI_API_KEY
       if (!browserbaseApiKey) {
         throw new Error("BROWSERBASE_API_KEY is required to run browser workflows.")
       }
 
       stagehand = await retry.onThrow(
         async ({ attempt }) => {
-          let launchedBrowser: Awaited<
-            ReturnType<typeof browserbase.launch>
-          > | undefined
-
           try {
-            launchedBrowser = await browserbase.launch({
+            const initializedStagehand = new Stagehand({
+              env: "BROWSERBASE",
               apiKey: browserbaseApiKey,
-            })
-            const initializedStagehand = await Stagehand.create({
-              browser: launchedBrowser,
               model: {
-                modelName: "openai/gpt-5.4-mini",
-                ...(openaiApiKey ? { apiKey: openaiApiKey } : {}),
+                modelName: "auto",
               },
+              // Trigger.dev provides the task logger; avoid Stagehand's Pino
+              // worker, which cannot resolve its worker file from the bundle.
+              disablePino: true,
             })
+            await initializedStagehand.init()
 
-            browser = launchedBrowser
             return initializedStagehand
           } catch (error) {
-            await launchedBrowser?.close().catch(() => undefined)
             logger.warn("Browserbase connection attempt failed", {
               attempt,
               error: serializeError(error),
@@ -103,7 +96,7 @@ export const runWorkflowTask = task({
         }
       )
 
-      return stagehand
+      return stagehand!
     }
 
     try {
@@ -147,13 +140,6 @@ export const runWorkflowTask = task({
         })
       }
 
-      try {
-        await browser?.close()
-      } catch (error) {
-        logger.warn("Browserbase cleanup failed after workflow execution", {
-          error: serializeError(error),
-        })
-      }
     }
 
     return { steps, outputs }

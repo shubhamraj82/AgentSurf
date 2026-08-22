@@ -8,11 +8,11 @@ export async function act({
   instruction: string
 }) {
   const result = await stagehand.act(instruction)
-  const page = await stagehand.browser.context.activePage()
+  const page = await stagehand.context.activePage()
 
   return {
-    success: result.data.success,
-    message: result.data.message,
+    success: result.success,
+    message: result.message,
     url: page ? await page.url() : "",
   }
 }

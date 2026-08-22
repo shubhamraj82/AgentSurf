@@ -12,8 +12,8 @@ export async function extract({
 
   logger.log("Extraction completed", {
     instruction,
-    extraction: result.data.extraction,
+    extraction: result.extraction,
   })
 
-  return { extraction: result.data.extraction }
+  return { extraction: result.extraction }
 }

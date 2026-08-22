@@ -8,9 +8,9 @@ export async function openUrl({
   stagehand: Stagehand
   url: string
 }) {
-  const [page] = await stagehand.browser.context.pages()
+  const [page] = await stagehand.context.pages()
   const normalizedUrl = getNormalizedHttpUrl(url)
-  await page.goto(normalizedUrl, { waitUntil: "load", timeout: 30_000 })
+  await page.goto(normalizedUrl, { waitUntil: "load", timeoutMs: 30_000 })
 
   return { url: await page.url(), title: await page.title() }
 }

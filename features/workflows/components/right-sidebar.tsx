@@ -28,6 +28,7 @@ import {
   runWorkflowAction,
 } from "@/features/workflows/actions"
 import { validateGraph } from "../lib/validate-graph"
+import { getUrlValidationError } from "../lib/validate-url"
 import { useUpstreamConnections } from "../hooks/use-upstream-connections"
 import {
   nodeRegistry,
@@ -87,6 +88,8 @@ function Field({
   onFocus: () => void
   inputRef: (element: HTMLInputElement | HTMLTextAreaElement | null) => void
 }) {
+  const validationError =
+    field.key === "url" ? getUrlValidationError(value) : undefined
   const sharedProps = {
     id: field.key,
     value,
@@ -96,12 +99,23 @@ function Field({
     ) => onChange(event.target.value),
     onFocus,
     ref: inputRef,
+    "aria-invalid": Boolean(validationError),
+    className: cn(
+      validationError && "border-destructive focus-visible:ring-destructive"
+    ),
   }
 
-  return field.multiline ? (
-    <Textarea {...sharedProps} />
-  ) : (
-    <Input {...sharedProps} />
+  return (
+    <>
+      {field.multiline ? (
+        <Textarea {...sharedProps} />
+      ) : (
+        <Input {...sharedProps} />
+      )}
+      {validationError && (
+        <p className="text-xs text-destructive">{validationError}</p>
+      )}
+    </>
   )
 }
 

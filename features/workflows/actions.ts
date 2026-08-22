@@ -61,7 +61,10 @@ export async function runWorkflowAction({
   const handle =  await tasks.trigger<typeof runWorkflowTask>(
     "run-workflow",
     { workflowId: id, orgId },
-    {tags:[`workflow:${id}`]}
+    {
+      tags: [`workflow:${id}`],
+      maxAttempts: 3,
+    }
   )
   return {
     runId: handle.id,

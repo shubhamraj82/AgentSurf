@@ -1,5 +1,5 @@
 import toposort from "toposort"
-import { AbortTaskRunError, logger, task } from "@trigger.dev/sdk"
+import { logger, metadata, task } from "@trigger.dev/sdk"
 import { getWorkflow } from "@/features/workflows/data"
 import { Stagehand } from "@browserbasehq/stagehand"
 import { nodeExecutors } from "@/features/workflows/nodes/node-executer"
@@ -8,8 +8,16 @@ import {
   type WorkflowNodeOutputs,
 } from "@/features/workflows/lib/interpolate"
 
+export type RunStep = {
+  nodeId: string
+  status: "pending" | "running" | "done" | "failed"
+}
+
 export const runWorkflowTask = task({
   id: "run-workflow",
+  retry: {
+    maxAttempts: 3,
+  },
   run: async ({ workflowId, orgId }: { workflowId: string; orgId: string }) => {
     const workflow = await getWorkflow(orgId, workflowId)
     if (!workflow?.graph)
@@ -25,6 +33,22 @@ export const runWorkflowTask = task({
         edges.map((e) => [e.source, e.target])
       )
       .filter((id) => connected.has(id))
+
+      logger.log(`Running workflow ${workflow.name}`,{steps:order.length})
+
+    const steps: RunStep[] = order.map((nodeId) => ({
+      nodeId,
+      status: "pending",
+    }))
+    metadata.set("steps", steps)
+
+    const setStepStatus = (nodeId: string, status: RunStep["status"]) => {
+      const step = steps.find((step) => step.nodeId === nodeId)
+      if (!step) return
+
+      step.status = status
+      metadata.set("steps", steps)
+    }
 
     logger.log(`Running workflow ${workflow.name}`, { steps: order.length })
 
@@ -54,32 +78,33 @@ export const runWorkflowTask = task({
         if (!node) continue
         logger.log(`Running step: ${node.data.title}`)
         const executor = nodeExecutors[node.data.type]
-        if (executor) {
-          const values = Object.fromEntries(
-            Object.entries(node.data.values).map(([key, value]) => [
-              key,
-              interpolate(value, outputs),
-            ])
-          )
 
-          try {
+        setStepStatus(id, "running")
+        await metadata.flush()
+
+        try {
+          if (executor) {
+            const values = Object.fromEntries(
+              Object.entries(node.data.values).map(([key, value]) => [
+                key,
+                interpolate(value, outputs),
+              ])
+            )
+
             outputs[id] = await executor({ values, getStagehand })
-          } catch (error) {
-            if (
-              error instanceof Error &&
-              error.message.startsWith("Open URL")
-            ) {
-              throw new AbortTaskRunError(error.message)
-            }
-
-            throw error
           }
+          setStepStatus(id, "done")
+        } catch (error) {
+          setStepStatus(id, "failed")
+          await metadata.flush()
+
+          throw error
         }
       }
     } finally {
       await stagehand?.close()
     }
 
-    return { steps: order.length }
+    return { steps }
   },
 })

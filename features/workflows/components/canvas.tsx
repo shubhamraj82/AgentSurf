@@ -8,10 +8,14 @@ import {
   ReactFlow,
   type ColorMode,
   type Edge,
+  type OnConnect,
+  type OnDelete,
+  type OnEdgesChange,
+  type OnNodesChange,
   NodeTypes,
   Panel,
 } from "@xyflow/react"
-import { useLiveblocksFlow, Cursors } from "@liveblocks/react-flow"
+import { Cursors } from "@liveblocks/react-flow"
 import { useTheme } from "next-themes"
 import { useSyncExternalStore } from "react"
 import { AvatarStack } from "@liveblocks/react-ui"
@@ -25,39 +29,31 @@ import "@liveblocks/react-flow/styles.css"
 
 const nodeTypes: NodeTypes = { step: StepNode }
 
-const initialNodes: StepNodeType[] = [
-  {
-    id: "start",
-    type: "step",
-    position: { x: 0, y: 0 },
-    data: {
-      type: "start",
-      kind: "trigger",
-      title: "Start",
-      values: {},
-    },
-  },
-]
-
-const initialEdges: Edge[] = []
-
 const subscribe = () => () => {}
 const getClientSnapshot = () => true
 const getServerSnapshot = () => false
 
-export function Canvas() {
+export function Canvas({
+  nodes,
+  edges,
+  onNodesChange,
+  onEdgesChange,
+  onConnect,
+  onDelete,
+}: {
+  nodes: StepNodeType[]
+  edges: Edge[]
+  onNodesChange: OnNodesChange<StepNodeType>
+  onEdgesChange: OnEdgesChange<Edge>
+  onConnect: OnConnect
+  onDelete: OnDelete<StepNodeType, Edge>
+}) {
   const { resolvedTheme } = useTheme()
   const mounted = useSyncExternalStore(
     subscribe,
     getClientSnapshot,
     getServerSnapshot
   )
-  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, onDelete } =
-    useLiveblocksFlow<StepNodeType, Edge>({
-      suspense: true,
-      nodes: { initial: initialNodes },
-      edges: { initial: initialEdges },
-    })
   const colorMode: ColorMode =
     mounted && resolvedTheme === "dark" ? "dark" : "light"
 

@@ -1,8 +1,8 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useRef, useState, useTransition } from "react"
 import { MoreHorizontal, Play, Trash2 } from "lucide-react"
-import { useReactFlow,useStore } from "@xyflow/react"
+import { useReactFlow, useStore, type OnNodesChange } from "@xyflow/react"
 import { toast } from "sonner"
 import {
   Accordion,
@@ -23,8 +23,12 @@ import { ResizablePanel } from "@/components/ui/resizable"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
-import { deleteWorkflowAction , runWorkflowAction} from "@/features/workflows/actions"
+import {
+  deleteWorkflowAction,
+  runWorkflowAction,
+} from "@/features/workflows/actions"
 import { validateGraph } from "../lib/validate-graph"
+import { useUpstreamConnections } from "../hooks/use-upstream-connections"
 import {
   nodeRegistry,
   type NodeDefinition,
@@ -74,10 +78,14 @@ function Field({
   field,
   value,
   onChange,
+  onFocus,
+  inputRef,
 }: {
   field: NodeField
   value: string
   onChange: (value: string) => void
+  onFocus: () => void
+  inputRef: (element: HTMLInputElement | HTMLTextAreaElement | null) => void
 }) {
   const sharedProps = {
     id: field.key,
@@ -86,6 +94,8 @@ function Field({
     onChange: (
       event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
     ) => onChange(event.target.value),
+    onFocus,
+    ref: inputRef,
   }
 
   return field.multiline ? (
@@ -95,8 +105,22 @@ function Field({
   )
 }
 
-function Inspector({ node }: { node: StepNodeType | undefined }) {
-  const {updateNodeData} = useReactFlow<StepNodeType>()
+function Inspector({
+  node,
+  onNodesChange,
+}: {
+  node: StepNodeType | undefined
+  onNodesChange: OnNodesChange<StepNodeType>
+}) {
+  const upstreamConnections = useUpstreamConnections(node)
+  const [lastEditedField, setLastEditedField] = useState<{
+    nodeId: string
+    fieldKey: string
+  }>()
+  const fieldRefs = useRef<
+    Record<string, HTMLInputElement | HTMLTextAreaElement | null>
+  >({})
+
   if (!node) {
     return (
       <Section title="Editoor">
@@ -107,6 +131,34 @@ function Inspector({ node }: { node: StepNodeType | undefined }) {
 
   const { type, title, values } = node.data
   const def: NodeDefinition = nodeRegistry[type]
+  const insertIntoField = (token: string) => {
+    const fieldKey =
+      lastEditedField?.nodeId === node.id
+        ? lastEditedField.fieldKey
+        : def.fields[0]?.key
+
+    if (!fieldKey) {
+      return
+    }
+
+    const field = fieldRefs.current[fieldKey]
+
+    onNodesChange([
+      {
+        type: "replace",
+        id: node.id,
+        item: {
+          ...node,
+          data: { ...node.data, values: { ...values, [fieldKey]: token } },
+        },
+      },
+    ])
+
+    requestAnimationFrame(() => {
+      field?.focus()
+      field?.setSelectionRange(token.length, token.length)
+    })
+  }
 
   return (
     <Section title={title} icon={<NodeIcon type={type} />}>
@@ -124,13 +176,53 @@ function Inspector({ node }: { node: StepNodeType | undefined }) {
                 field={field}
                 value={values[field.key] ?? ""}
                 onChange={(value) => {
-                  updateNodeData(node.id, {
-                    values: { ...values, [field.key]: value },
-                  })
+                  setLastEditedField({ nodeId: node.id, fieldKey: field.key })
+                  onNodesChange([
+                    {
+                      type: "replace",
+                      id: node.id,
+                      item: {
+                        ...node,
+                        data: {
+                          ...node.data,
+                          values: { ...values, [field.key]: value },
+                        },
+                      },
+                    },
+                  ])
+                }}
+                onFocus={() =>
+                  setLastEditedField({ nodeId: node.id, fieldKey: field.key })
+                }
+                inputRef={(element) => {
+                  fieldRefs.current[field.key] = element
                 }}
               />
             </div>
           ))
+        )}
+        {upstreamConnections.length > 0 && (
+          <div className="flex flex-col gap-1.5 border-t pt-3">
+            <Label className="text-xs">Connections</Label>
+            <div className="flex flex-wrap gap-1.5">
+              {upstreamConnections.map((connection) => (
+                <button
+                  key={connection.token}
+                  type="button"
+                  disabled={def.fields.length === 0}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => insertIntoField(connection.token)}
+                  className="inline-flex items-center gap-1 rounded-md border bg-muted px-1.5 py-1 text-xs font-medium hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <NodeIcon
+                    type={connection.sourceNodeType}
+                    className="size-4 [&_svg]:size-2.5"
+                  />
+                  {connection.label}
+                </button>
+              ))}
+            </div>
+          </div>
         )}
       </div>
     </Section>
@@ -269,7 +361,7 @@ function ActionMenu({ workflowId }: { workflowId: string }) {
   )
 }
 
-function RunButton({workflowId}: {workflowId:string}) {
+function RunButton({ workflowId }: { workflowId: string }) {
   const { getNodes, getEdges } = useReactFlow<StepNodeType>()
   const [ispending, startTransition] = useTransition()
   return (
@@ -279,9 +371,9 @@ function RunButton({workflowId}: {workflowId:string}) {
       disabled={ispending}
       onClick={() => {
         // TODO: validate the graph and run the workflow (toggle to stop while running)
-        const graph = {nodes:getNodes(), edges:getEdges()}
+        const graph = { nodes: getNodes(), edges: getEdges() }
         const problems = validateGraph(graph)
-        if(problems.length>0){
+        if (problems.length > 0) {
           toast.error(problems[0])
           return
         }
@@ -297,13 +389,20 @@ function RunButton({workflowId}: {workflowId:string}) {
   )
 }
 
-export function RightSidebar({ workflowId }: { workflowId: string }) {
+export function RightSidebar({
+  workflowId,
+  onNodesChange,
+}: {
+  workflowId: string
+  onNodesChange: OnNodesChange<StepNodeType>
+}) {
   const [tab, setTab] = useState("toolbar")
   // TODO: read the currently selected node from React flow
-  const selected=useStore((s)=>s.nodes.find((n)=>n.selected)) as StepNodeType | undefined
+  const selected = useStore((s) => s.nodes.find((n) => n.selected)) as
+    StepNodeType | undefined
   //TODO : auto-switch to the editor tab when the selection chnages
-  const [prevSelectedId,setPrevSelectedId]=useState(selected?.id)
-  if(selected && selected.id !== prevSelectedId){
+  const [prevSelectedId, setPrevSelectedId] = useState(selected?.id)
+  if (selected && selected.id !== prevSelectedId) {
     setPrevSelectedId(selected.id)
     setTab("editor")
   }
@@ -339,7 +438,11 @@ export function RightSidebar({ workflowId }: { workflowId: string }) {
           <Palette />
         </TabsContent>
         <TabsContent value="editor" className="flex min-h-0 flex-col">
-          <Inspector node={selected} />
+          <Inspector
+            key={selected?.id}
+            node={selected}
+            onNodesChange={onNodesChange}
+          />
         </TabsContent>
       </Tabs>
     </ResizablePanel>

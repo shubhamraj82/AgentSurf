@@ -1,4 +1,4 @@
-import { Globe, LucideIcon, MousePointerClick } from "lucide-react"
+import { Globe, LucideIcon, MousePointer2, MousePointerClick, Search } from "lucide-react"
 import type {Node} from "@xyflow/react"
 
 
@@ -49,6 +49,46 @@ export const nodeRegistry={
         outputs:[
             {path:"url",label:"URL"},
             {path:"title",label:"Title"},
+        ],
+    },
+    "act": {
+        type:"act",
+        kind:"action",
+        label:"Act",
+        icon:MousePointer2,
+        accent:"bg-violet-500 text-white",
+        fields:[
+            {
+                key:"instruction",
+                label:"Instruction",
+                placeholder:"Click the sign in button",
+                multiline:true,
+                required:true,
+            },
+        ],
+        outputs:[
+            {path:"success",label:"Succeeded"},
+            {path:"message",label:"Message"},
+            {path:"url",label:"URL"},
+        ],
+    },
+    "extract": {
+        type:"extract",
+        kind:"action",
+        label:"Extract",
+        icon:Search,
+        accent:"bg-amber-500 text-white",
+        fields:[
+            {
+                key:"instruction",
+                label:"Instruction",
+                placeholder:"Extract the price of the first product",
+                multiline:true,
+                required:true,
+            },
+        ],
+        outputs:[
+            {path:"extraction",label:"Extracted data"},
         ],
     },
 } satisfies Record<string,NodeDefinition>
